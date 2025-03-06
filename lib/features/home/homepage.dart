@@ -1,7 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class AmalaBhavanHomePage extends StatelessWidget {
+import '../../common_widget/custom_alert_dialog.dart';
+
+class AmalaBhavanHomePage extends StatefulWidget {
   const AmalaBhavanHomePage({super.key});
+
+  @override
+  State<AmalaBhavanHomePage> createState() => _AmalaBhavanHomePageState();
+}
+
+class _AmalaBhavanHomePageState extends State<AmalaBhavanHomePage> {
+  final List<String> _imageUrls = [];
+
+  @override
+  void initState() {
+    getData();
+    super.initState();
+  }
+
+  void getData() {
+    Supabase.instance.client.from('gallerys').select('*').then((response) {
+      final data = response;
+      final images = data.map((image) {
+        return image['image'] as String;
+      }).toList();
+
+      setState(() {
+        _imageUrls.clear();
+        _imageUrls.addAll(images);
+      });
+    }).onError((e, s) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error fetching users: ${e!.toString()}")));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -10,15 +44,17 @@ class AmalaBhavanHomePage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      extendBody: true,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Row(
           children: [
             const Text(
               'Hybridorph',
               style: TextStyle(
-                color: Colors.black87,
+                color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -35,7 +71,13 @@ class AmalaBhavanHomePage extends StatelessWidget {
                   NavItem('ABOUT'),
                   NavItem('ACTIVITIES'),
                   NavItem('GALLERY'),
-                  NavItem('DONATE'),
+                  NavItem(
+                    'DONATE',
+                    onTap: () {
+                      launchUrl(Uri.parse(
+                          'https://razorpay.com/payment-link/plink_Q2vaArhY1M9pAn/test'));
+                    },
+                  ),
                   NavItem('CONTACT'),
                 ],
               ),
@@ -70,7 +112,12 @@ class AmalaBhavanHomePage extends StatelessWidget {
                   ListTile(title: const Text('ABOUT'), onTap: () {}),
                   ListTile(title: const Text('ACTIVITIES'), onTap: () {}),
                   ListTile(title: const Text('GALLERY'), onTap: () {}),
-                  ListTile(title: const Text('DONATE'), onTap: () {}),
+                  ListTile(
+                      title: const Text('DONATE'),
+                      onTap: () {
+                        launchUrl(Uri.parse(
+                            'https://razorpay.com/payment-link/plink_Q2vaArhY1M9pAn/test'));
+                      }),
                   ListTile(title: const Text('CONTACT'), onTap: () {}),
                 ],
               ),
@@ -82,7 +129,7 @@ class AmalaBhavanHomePage extends StatelessWidget {
           children: [
             // Hero Section
             Container(
-              height: 500,
+              height: MediaQuery.sizeOf(context).height,
               decoration: const BoxDecoration(
                 image: DecorationImage(
                   image: NetworkImage('assets/images/group of kids.jpg'),
@@ -124,7 +171,10 @@ class AmalaBhavanHomePage extends StatelessWidget {
                       ),
                       const SizedBox(height: 32),
                       ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          launchUrl(Uri.parse(
+                              'https://razorpay.com/payment-link/plink_Q2vaArhY1M9pAn/test'));
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF4CAF50),
                           padding: const EdgeInsets.symmetric(
@@ -235,29 +285,54 @@ class AmalaBhavanHomePage extends StatelessWidget {
                       color: Color(0xFF4CAF50),
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  GridView.count(
-                    crossAxisCount: isDesktop ? 3 : 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    children: List.generate(
-                      6,
-                      (index) => Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          image: DecorationImage(
-                            image: NetworkImage(
-                                'assets/images/kindimage${index + 1}.jpg'),
-                            fit: BoxFit.cover,
-                            onError: (exception, stackTrace) =>
-                                print('Failed to load image'),
-                          ),
-                        ),
+                  if (_imageUrls.isEmpty)
+                    Center(
+                      child: Text("No images found"),
+                    )
+                  else
+                    GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      shrinkWrap: true,
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 100, vertical: 10),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
                       ),
+                      itemCount: _imageUrls.length,
+                      itemBuilder: (context, index) {
+                        return GestureDetector(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => CustomAlertDialog(
+                                title: 'Remove Image',
+                                description:
+                                    'Are you sure you want to remove this image?',
+                                primaryButton: 'Remove',
+                                onPrimaryPressed: () async {
+                                  await Supabase.instance.client
+                                      .from('gallerys')
+                                      .delete()
+                                      .eq('image', _imageUrls[index]);
+                                  Navigator.pop(context);
+                                  getData();
+                                },
+                                secondaryButton: 'Cancel',
+                                onSecondaryPressed: () {
+                                  Navigator.pop(context);
+                                },
+                              ),
+                            );
+                          },
+                          child: Image.network(
+                            _imageUrls[index],
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      },
                     ),
-                  ),
                 ],
               ),
             ),
@@ -288,7 +363,10 @@ class AmalaBhavanHomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
                   ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      launchUrl(Uri.parse(
+                          'https://razorpay.com/payment-link/plink_Q2vaArhY1M9pAn/test'));
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
@@ -335,7 +413,10 @@ class AmalaBhavanHomePage extends StatelessWidget {
                             style: TextStyle(color: Colors.white)),
                       ),
                       TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          launchUrl(Uri.parse(
+                              'https://razorpay.com/payment-link/plink_Q2vaArhY1M9pAn/test'));
+                        },
                         child: const Text('Donate',
                             style: TextStyle(color: Colors.white)),
                       ),
@@ -367,15 +448,19 @@ class AmalaBhavanHomePage extends StatelessWidget {
 
 class NavItem extends StatelessWidget {
   final String title;
+  final Function()? onTap;
 
-  const NavItem(this.title, {super.key});
+  const NavItem(this.title, {super.key, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
       child: TextButton(
-        onPressed: () {},
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          backgroundColor: Colors.white.withAlpha(150),
+        ),
         child: Text(
           title,
           style: const TextStyle(
